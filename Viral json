@@ -1,1 +1,86 @@
-
+{
+  "name": "TikTok Smartphone Video Bot",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [{}],
+        "polling": true
+      },
+      "id": "1",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "credentials": {
+        "telegramApi": {
+          "id": "replace_with_your_bot_token_id",
+          "name": "Your Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "command": "apt-get update && apt-get install -y ffmpeg python3-pip && pip3 install --no-cache-dir yt-dlp"
+      },
+      "id": "2",
+      "name": "Install Tools",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "command": "yt-dlp -o \"/tmp/video.mp4\" {{$json[\"message\"][\"text\"]}}"
+      },
+      "id": "3",
+      "name": "Download Video",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "command": "ffmpeg -i /tmp/video.mp4 -vf \"scale=720:1280\" -c:a copy /tmp/video_out.mp4"
+      },
+      "id": "4",
+      "name": "Format Video",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [950, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json[\"message\"][\"chat\"][\"id\"]}}",
+        "sendMessage": false,
+        "sendPhoto": false,
+        "sendDocument": true,
+        "documentPath": "/tmp/video_out.mp4"
+      },
+      "id": "5",
+      "name": "Send Processed Video",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [1200, 300],
+      "credentials": {
+        "telegramApi": {
+          "id": "replace_with_your_bot_token_id",
+          "name": "Your Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [[{ "node": "Install Tools", "type": "main", "index": 0 }]]
+    },
+    "Install Tools": {
+      "main": [[{ "node": "Download Video", "type": "main", "index": 0 }]]
+    },
+    "Download Video": {
+      "main": [[{ "node": "Format Video", "type": "main", "index": 0 }]]
+    },
+    "Format Video": {
+      "main": [[{ "node": "Send Processed Video", "type": "main", "index": 0 }]]
+    }
+  }
+}
