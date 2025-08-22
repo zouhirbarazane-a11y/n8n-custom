@@ -1,1 +1,162 @@
-
+{
+  "name": "Telegram Video Filter & Return",
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [250, 250],
+      "parameters": {
+        "updates": ["message"],
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "replace-with-your-telegram-credentials-id",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "id": "2",
+      "name": "Extract URL",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [500, 250],
+      "parameters": {
+        "fields": {
+          "video_url": "={{$json[\"message\"][\"text\"]}}"
+        }
+      }
+    },
+    {
+      "id": "3",
+      "name": "Download Video",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [750, 250],
+      "parameters": {
+        "command": "yt-dlp",
+        "arguments": "{{$json[\"video_url\"]}} -o /tmp/input.mp4"
+      }
+    },
+    {
+      "id": "4",
+      "name": "Check for Music",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1000, 200],
+      "parameters": {
+        "command": "ffprobe",
+        "arguments": "-i /tmp/input.mp4 -show_streams -select_streams a -loglevel error"
+      }
+    },
+    {
+      "id": "5",
+      "name": "Face/Gender Filter",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1000, 300],
+      "parameters": {
+        "url": "http://deepstack:5000/v1/vision/face/recognize",
+        "method": "POST",
+        "sendBinaryData": true,
+        "binaryPropertyName": "data",
+        "options": {}
+      }
+    },
+    {
+      "id": "6",
+      "name": "Decision Filter",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1250, 250],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"contains_music\"]}}",
+              "operation": "notEqual",
+              "value2": "true"
+            },
+            {
+              "value1": "={{$json[\"contains_woman\"]}}",
+              "operation": "notEqual",
+              "value2": "true"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "7",
+      "name": "Send Clean Video",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [1500, 200],
+      "parameters": {
+        "chatId": "YOUR_CHAT_ID",
+        "message": "Here is your filtered video:",
+        "additionalFields": {
+          "video": "file:///tmp/input.mp4"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "replace-with-your-telegram-credentials-id",
+          "name": "Telegram Bot"
+        }
+      }
+    },
+    {
+      "id": "8",
+      "name": "Send Reject",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [1500, 300],
+      "parameters": {
+        "chatId": "YOUR_CHAT_ID",
+        "message": "❌ Video rejected (contains music or women)"
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "replace-with-your-telegram-credentials-id",
+          "name": "Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [{ "node": "Extract URL", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract URL": {
+      "main": [
+        [{ "node": "Download Video", "type": "main", "index": 0 }]
+      ]
+    },
+    "Download Video": {
+      "main": [
+        [
+          { "node": "Check for Music", "type": "main", "index": 0 },
+          { "node": "Face/Gender Filter", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Check for Music": {
+      "main": [[{ "node": "Decision Filter", "type": "main", "index": 0 }]]
+    },
+    "Face/Gender Filter": {
+      "main": [[{ "node": "Decision Filter", "type": "main", "index": 0 }]]
+    },
+    "Decision Filter": {
+      "main": [
+        [{ "node": "Send Clean Video", "type": "main", "index": 0 }],
+        [{ "node": "Send Reject", "type": "main", "index": 0 }]
+      ]
+    }
+  }
+}
